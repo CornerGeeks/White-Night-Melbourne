@@ -2,6 +2,7 @@ Premise
 -------
 Trying to replicate the White Night Melbourne iOS app as a webapp and Phonegap app for Android
 http://whitenightmelbourne.com.au/
+Disclaimer: I have no affiliation with the White Night Melbourne event. Am just an Android user bummed that we didn't get any app when it is pretty simple to do
 
 Important URLs
 -------------
