@@ -1,0 +1,295 @@
+<html> 
+<head> 
+	<title>White Night Melbourne</title> 
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta name="format-detection" content="telephone=no" />
+	<meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi" />
+	<link rel="stylesheet" type="text/css" href="css/index.css" />
+	
+	<!-- jquery mobile - 1 -->
+	<link rel="stylesheet"  href="css/jqm_themes/default/jquery.mobile-1.2.0.css" />
+	<script src="js/jquery-1.8.3.min.js"></script>
+	<script src="js/jquery.mobile-1.2.0.min.js"></script>
+	<!-- jquery mobile - 0 -->
+
+	<!-- jquery maps - 1 -->
+	<script src="https://maps.googleapis.com/maps/api/js?sensor=true"></script>
+	<script src="js/jquery.ui.map.min.js"></script>
+	<script src="js/jquery.ui.map.extensions.js"></script>
+	<script src="js/jquery.ui.map.services.min.js"></script>
+	<!-- jquery maps - 0 -->
+	
+	<!-- phonegap - 1 -->
+	<script type="text/javascript" src="cordova-2.2.0.js"></script>
+	<script type="text/javascript" src="js/index.js"></script>
+	<script type="text/javascript">
+		app.initialize();
+	</script>
+	<!-- phonegap - 0 -->
+	<style type="text/css">
+		.template { display: none;}
+	</style>
+<script>
+	var DEFAULT_LOCATION = new google.maps.LatLng(-37.816667, 144.966667);
+								
+	var DEFAULT_ZOOM = 14;
+	var MAP_ID = "#map_canvas";
+	var MAP_SMALL_ID = "#map_canvas_small";
+	var config = {};
+
+// http://app.whitenightmelbourne.com.au/index.php/event/eventlist
+// http://app.whitenightmelbourne.com.au/index.php/precinct/eventlist?precinct_id=
+		config.local = true;
+		config.prefix = 'http://app.whitenightmelbourne.com.au/index.php/';
+		if(config.local) config.prefix = '';
+		// http://stackoverflow.com/questions/4535888/jquery-text-and-newlines
+		function htmlForTextWithEmbeddedNewlines(text) {
+		    var htmls = [];
+		    var lines = text.split(/\n/);
+		    // The temporary <div/> is to perform HTML entity encoding reliably.
+		    //
+		    // document.createElement() is *much* faster than jQuery('<div/>')
+		    // http://stackoverflow.com/questions/268490/
+		    //
+		    // You don't need jQuery but then you need to struggle with browser
+		    // differences in innerText/textContent yourself
+		    var tmpDiv = jQuery(document.createElement('div'));
+		    for (var i = 0 ; i < lines.length ; i++) {
+		        htmls.push(tmpDiv.text(lines[i]).html());
+		    }
+		    return htmls.join("<br>");
+		}
+		$(document).on('pagebeforeshow', "#map-page", function(){
+			if(!config.map){
+				$.getJSON(config.prefix+"event/eventlist", {}, function(data) {
+					config.map = data;
+					$(MAP_ID).gmap({'center': DEFAULT_LOCATION, 'zoom': DEFAULT_ZOOM, 'mapTypeControl': false}).bind('init', function(evt, map) {
+
+						$(map).click(function(e){
+
+						});
+						// drag map. load search after 1 second after drag ends
+					});
+					for(var i = 0; i < data.events.length; i++){
+						var ia = i;
+						var d = data.events[i];
+
+        				$(MAP_ID).gmap('addMarker', 
+        					{ 
+								'bounds':true, 
+        						'position': new google.maps.LatLng(d.latitude, d.longitude) 
+        					}, 
+        					function(map, marker){ 
+        						marker.id = i;
+        						$(marker).click(function() {
+        							var d = config.map.events[marker.id];
+        							if(typeof(infowindow) != 'undefined') infowindow.close();
+									else infowindow = new google.maps.InfoWindow();
+									infowindow.setContent(
+										'<a href="#detail-page" onclick="config.data = config.map; config.selected = ' + marker.id + ';return false;">' + d.title + "</a>"  +
+										"<div>" + d.start_time + " - " + d.end_time + "</div>" + 
+										"<div>" + d.price + "</div>" +
+										""
+									);
+									infowindow.setPosition(marker.getPosition());
+									infowindow.open(map);
+        						});
+        					}
+        				);
+					}
+					var height = 129;
+		            $(MAP_ID).height($(window).height() - height);
+		            $('#map-page').height($(window).height() - height).css('min-height', $(window).height() - height + 'px');
+					$(MAP_ID).gmap('refresh', 1);
+
+				});
+			}
+		})
+		$(document).on('pagebeforeshow', "#program-page", function () {
+			
+			var id = config.pid;
+			if(!id || id == 0){
+				url = "event/eventlist";
+			}
+			else{
+				url = "precinct/eventlist?precinct_id="+id;
+				if(config.local) url = "precinct/eventlist%3fprecinct_id="+id;
+			}
+
+			var list = $("#program-page .list").eq(0);
+			var template = $("#program-page").find(".template.row");
+			list.empty();
+
+			$.getJSON(config.prefix+url, {}, function(data) {
+				config.list = data;
+				for(var i = 0; i < data.events.length; i++){
+					var d = data.events[i];
+					var title = d.title;
+					var row = template.clone();
+					row.removeClass("template");
+					row.find(".title").text(title);
+					row.find(".url").attr("data-url", i);
+					list.append(row);
+				}
+				try { list.listview("refresh"); } catch(err){}
+				$(list).find("li a").click(function(e){
+					e.preventDefault();
+					config.selected = $(this).attr("data-url");
+					config.data = config.list;
+				});
+
+			});				
+		});		
+		$(document).on('pagebeforeshow', "#detail-page", function () {
+			if(!config.data || !config.selected){
+				$.mobile.changePage( "#program-page", { transition: "slide"} );
+				return;
+			}
+			var d = config.data.events[config.selected];
+			$("#d_title").text(d.title);
+			$("#d_presented_by").text(d.presented_by);
+			$("#d_date").text(d.event_date);
+			$("#d_time_start").text(d.start_time);
+			$("#d_time_end").text(d.end_time);
+			$("#d_location").text(d.venue_name);
+			$("#d_address_one").text(d.address_one);
+			$("#d_url_to_purchase").text(d.url_to_purchase).attr('href', d.url_to_purchase);
+			$("#d_price").text(d.price);
+			$("#d_description").html(htmlForTextWithEmbeddedNewlines(d.description));
+			$("#d_image").attr("src",d.image_url);
+
+/*
+{"id":"106",
+"precinct_id":"1",
+"image_url":"http:\/\/app.whitenightmelbourne.com.au\/upload\/uptown_brown.jpg",
+"presented_by":"",
+"description":"Singing gentleman-adventurer and inventor ?Uptown? Brown brings his Goodtimes Gyratorscope 1920s-50s repertoire to downtown Melbourne.",
+"event_date":"Saturday 23 February 2013",
+"start_time":"07:00:00 PM",
+"end_time":"07:00:00 AM",
+"venue_name":"Flinders Street",
+"address_one":"",
+"address_two":"",
+"city":"Melbourne",
+"post_code":"3000",
+"price":"FREE",
+"url_to_purchase":"",
+"latitude":"-37.816984",
+"longitude":"144.969425",
+"title":"\"Uptown\" Brown!",
+"state":"","country":""}
+*/				
+		});		
+		
+		$(document).ready(function(){
+			$("#precincts-page ul li a").click(function(e){
+				e.preventDefault();
+				config.pid = $(this).attr("data-url");
+			});
+		});
+
+</script>
+</head> 
+<body> 
+	<div data-role="page" id="precincts-page" data-add-back-btn="true">
+		<div data-role="header" data-position="fixed" data-id="head" id="headbar">
+			<h1>Precincts</h1>
+		</div>
+		<div data-role="content">
+			<ul class="list" data-role="listview" data-theme="d" data-divider-theme="d">	
+				<li class='row'><a href="#program-page" data-url="0">--All--</a></li>
+				<li class='row'><a href="#program-page" data-url="1">Wonderland</a></li>
+				<li class='row'><a href="#program-page" data-url="2">Thetre of Dreams</a></li>
+				<li class='row'><a href="#program-page" data-url="3">Elizabeth What Were You Thinking</a></li>
+				<li class='row'><a href="#program-page" data-url="4">The World Above</a></li>
+				<li class='row'><a href="#program-page" data-url="5">Light Fantastic</a></li>
+				<li class='row'><a href="#program-page" data-url="6">Love and Treasured</a></li>
+				<li class='row'><a href="#program-page" data-url="7">Pictures and Posters</a></li>
+				<li class='row'><a href="#program-page" data-url="8">Outer Limits</a></li>
+			</ul>
+		</div><!-- /content -->
+		<div data-role="footer" data-position="fixed" data-id="head" id="footerbar" data-tap-toggle="false" >
+            <div data-role="navbar" >
+                <ul>
+                    <li><a href="#precincts-page" data-mini="true" data-icon="search">Precincts</a></li>
+                    <li><a href="#program-page" data-mini="true" data-icon="plus">Program</a></li>
+                    <li><a href="#map-page" data-mini="true" data-icon="globe">Map</a></li>
+                </ul>
+            </div><!-- /navbar -->
+		</div><!-- /footer -->
+	</div>
+	<div data-role="page" id="program-page" data-add-back-btn="true">
+		<div data-role="header" data-position="fixed" data-id="head" id="headbar">
+			<h1>Program</h1>
+		</div>
+		<div data-role="content">
+			<ul class="list" data-role="listview" data-theme="d" data-divider-theme="d">	
+			</ul>
+		</div><!-- /content -->
+		<ul>
+			<li class='template row'>
+				<a href="#detail-page" data-url="" class="url">
+					<h3 class="title">title</h3>
+				</a>
+			</li>
+		</ul>
+		<div data-role="footer" data-position="fixed" data-id="head" id="footerbar" data-tap-toggle="false" >
+            <div data-role="navbar" >
+                <ul>
+                    <li><a href="#precincts-page" data-mini="true" data-icon="search">Precincts</a></li>
+                    <li><a href="#program-page" data-mini="true" data-icon="plus">Program</a></li>
+                    <li><a href="#map-page" data-mini="true" data-icon="globe">Map</a></li>
+                </ul>
+            </div><!-- /navbar -->
+		</div><!-- /footer -->	
+	</div>
+	<div data-role="page" id="detail-page" data-add-back-btn="true">
+		<div data-role="header" data-position="fixed" data-id="head" id="headbar">
+			<h1>Details</h1>
+		</div>
+		<div data-role="content">
+			<h2 id="d_title"></h2>
+			<h5 id="d_presented_by"></h5>
+			<img id="d_image" src="" />
+			<h4>Date and tme:</h4>
+			<div id="d_date"></div>
+			<span id="d_time_start"></span> - <span id="d_time_end"></span>
+			<h4>Location:</h4>
+			<div id="d_location"></div>
+			<div id="d_address_one"></div>
+			<h4>Price:</h4>
+			<span id="d_price"></span><a href="" id="d_url_to_purchase"></a>
+			<div id="d_description"></div>
+		</div><!-- /content -->
+		<div data-role="footer" data-position="fixed" data-id="head" id="footerbar" data-tap-toggle="false" >
+            <div data-role="navbar" >
+                <ul>
+                    <li><a href="#precincts-page" data-mini="true" data-icon="search">Precincts</a></li>
+                    <li><a href="#program-page" data-mini="true" data-icon="plus">Program</a></li>
+                    <li><a href="#map-page" data-mini="true" data-icon="globe">Map</a></li>
+                </ul>
+            </div><!-- /navbar -->
+		</div><!-- /footer -->	
+	</div>	
+
+	
+   <div data-role="page" id="map-page" data-add-back-btn="true" style="">
+		<div data-role="header" data-position="fixed" data-id="head" id="headbar">
+			<h1>Map</h1>
+		</div>
+		<div data-role="content" id="map_canvas">
+			
+		</div><!-- /content -->
+		<div data-role="footer" data-position="fixed" data-id="head" id="footerbar" data-tap-toggle="false" >
+            <div data-role="navbar" >
+                <ul>
+                    <li><a href="#precincts-page" data-mini="true" data-icon="search">Precincts</a></li>
+                    <li><a href="#program-page" data-mini="true" data-icon="plus">Program</a></li>
+                    <li><a href="#map-page" data-mini="true" data-icon="globe">Map</a></li>
+                </ul>
+            </div><!-- /navbar -->
+		</div><!-- /footer -->	
+	</div><!-- /page -->
+
+</body>
+</html>

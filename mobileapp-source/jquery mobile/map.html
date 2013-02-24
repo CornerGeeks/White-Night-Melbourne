@@ -1,0 +1,233 @@
+<html> 
+<head> 
+	<title>My Page</title> 
+	<meta name="viewport" content="width=device-width, initial-scale=1"> 
+	<!-- jquery mobile - 1 -->
+	<link rel="stylesheet"  href="css/themes/default/jquery.mobile-1.2.0.css" />
+	<script src="js/jquery.js"></script>
+	<script src="js/jquery.mobile-1.2.0.min.js"></script>
+	<!-- jquery mobile - 0 -->
+
+
+	<!-- jquery maps - 1 -->
+	<script src="https://maps.googleapis.com/maps/api/js?sensor=true"></script>
+	<script src="js/jquery.ui.map.min.js"></script>
+	<script src="js/jquery.ui.map.extensions.js"></script>
+	<script src="js/jquery.ui.map.services.js"></script>
+	
+	<!-- jquery maps - 0 -->
+	
+	// dialog box http://localhost/jquery-ui-map/demos/jquery-google-maps-geocoding.html
+	// pages:
+	//		map of listings
+	//			map of listings based on list http://localhost/jquery-ui-map/demos/jquery-google-maps-data-attribute.html
+	//			map of listings with item selected (hover / snippet)
+	// 				pagination http://localhost/jquery-ui-map/demos/jquery-google-maps-extend-with-pagination.html
+	//		page view  http://localhost/jquery-ui-map/demos/jquery-google-maps-microdata.html
+<script>
+
+		/*
+				http://localhost/communityfinder/webapp-source/data/get_markers.php?
+					format=json&
+					north_lat=-35.59478566548724&
+					east_lng=149.1119384765625&
+					south_lat=-38.47079371120379&
+					west_lng=142.0806884765625&
+					filter_text=farm&
+					filter_subtype=&
+					username=&
+					listing_id=		
+		*/
+		
+		
+		// draw map centred on location
+		function mapLocation(location){
+			console.log(location);
+			console.log(location.lat());
+			console.log(location.lng());
+			//$('#map_canvas').gmap({'centre': location.lat() + '' + location.lng()});
+		}
+		function findLocationByName(address){
+			// https://developers.google.com/maps/documentation/geocoding/
+			var geocoder = new google.maps.Geocoder(); // v3
+			geocoder.geocode( { 'address': address}, function(results, status) { // v3
+				switch (status) {
+					case google.maps.GeocoderStatus.OK:
+						var location = results[0];
+						console.log(location.formatted_address);
+						console.log(location.geometry.location);
+						mapLocation(location.geometry.location);
+						return;
+					case google.maps.GeocoderStatus.ZERO_RESULTS:
+						alert("No results found");
+						return;
+					case google.maps.GeocoderStatus.OVER_QUERY_LIMIT:
+						alert("Too many API calls...");
+						return; 
+					case google.maps.GeocoderStatus.REQUEST_DENIED:
+						alert("Request Denied. sensor not set?");
+						return;
+					case google.maps.GeocoderStatus.INVALID_REQUEST:
+						alert("Invalid request. Missing search location?");
+						return;
+					default:
+						alert("Unknown error");
+						return;
+				}
+			});
+		}
+		function loadMarkersFromJSON(){
+			$.getJSON( 'demo.json', function(data) { 
+				$.each( data.markers, function(i, marker) {
+					$('#map_canvas').gmap('addMarker', { 
+						'position': new google.maps.LatLng(marker.latitude, marker.longitude), 
+						'bounds': true 
+					}).click(function() {
+						$('#map_canvas').gmap('openInfoWindow', { 'content': marker.content }, this);
+					});
+				});
+			});		
+		}
+		
+		function loadMarksFromHTMLList(){
+			$("[data-gmapping]").each(function(i,el) {
+				var data = $(el).data('gmapping');
+				$('#map_canvas').gmap('addMarker', {
+						'id': data.id, 
+						'tags':data.tags, 
+						'position': new google.maps.LatLng(data.latlng.lat, data.latlng.lng), 
+						'bounds':false  // do not snap map to fit all points
+					}, function(map,marker) {
+					$(el).click(function() {
+						$(marker).triggerEvent('click');
+					});
+				}).click(function() {
+					$('#map_canvas').gmap('openInfoWindow', { 'content': $(el).find('.info-box').text() }, this);
+				});
+			});		
+		}
+		
+		$(document).ready(function () {
+			$("#btnTest").click(function(e){
+				//findLocationByName('brunswick');
+				//loadMarksFromHTMLList();
+				//loadMarkersFromJSON();
+			});
+			
+			loadMarksFromHTMLList();
+			// specify location - 1
+			$("#btnLocation").click(function(e){
+				e.preventDefault();
+				findLocationByName($("#txtLocation").val());
+			});
+			$("#btnMyLocation").click(function(e){
+				$('#map_canvas').gmap('getCurrentPosition', function(position, status) {
+					var position;
+					if ( status === 'OK' ) {
+						e.preventDefault();
+						 position = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+					}
+					else{
+						position = new google.maps.LatLng(-37.820724999999996,145.03867549999998);
+					}
+					mapLocation(position);
+				});
+			});
+			// specify location - 0
+			
+			$('#map_canvas').gmap().bind('init', function(evt, map) {
+				
+				
+				// drag map. load search after 1 second after drag ends
+				var drag_timer;
+				$(map).dragend(function(){
+					clearTimeout(drag_timer);
+					drag_timer = setTimeout("loadMarksFromHTMLList()", 1000);
+				});
+				$(map).drag(function(){
+					clearTimeout(drag_timer);
+				});
+				// 
+				
+				
+				$('#map_canvas').gmap('getCurrentPosition', function(position, status) {
+					var clientPosition;
+					if ( status === 'OK' ) {
+						 clientPosition = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+					}
+					else{
+						clientPosition = new google.maps.LatLng(-37.820724999999996,145.03867549999998);
+					}
+				
+					
+					/* add shape
+					$('#map_canvas').gmap('addShape', 'Circle', { 
+						'strokeWeight': 0, 
+						'fillColor': "#008595", 
+						'fillOpacity': 0.25, 
+						'center': clientPosition, 
+						'radius': 15, 
+						'clickable': false 
+					});
+					//*/
+				});   
+			});
+
+
+			/* standard Google Maps - ignore for now
+			var mapOptions = {
+				zoom: 14,
+				center: new google.maps.LatLng(0,0),
+				mapTypeId: google.maps.MapTypeId.ROADMAP
+			}; // v3
+			map = new google.maps.Map(document.getElementById('map_div'), mapOptions); // v3
+			
+			//bind map clicks to map click controller	
+			//GEvent.bind(map, "click", this, this.onMapClick); // v2
+			google.maps.event.addListener(map, 'click', function(event){ application.onMapClick(null, event.latLng); }); // v3
+			//*/
+		});
+
+
+</script>
+</head> 
+<body> 
+
+<div data-role="page">
+
+	<div data-role="header">
+		<h1>My Title</h1>
+	</div><!-- /header a change-->
+
+	<div data-role="content">	
+		Step 1: Specify location <input id="txtLocation" type="text"><input id="btnLocation" type="button" value="View Location">
+		<input id="btnMyLocation" type="button" value="Near Me">
+
+		<div id="map_canvas" style="height: 300px; width: 100%"></div>
+		Step 2: Add filter <input id="txtSearch" type="text"><input id="btnSearch" type="button" value="Search Location">
+
+					<ul>
+						<li data-gmapping='{"id":"m_1","latlng":{"lat":27.6648274,"lng":-81.51575350000002},"tags":"drupal"}'>
+							<p class="info-box">Florida DrupalCamp - Feb 11 2012</p>
+						</li>
+						<li data-gmapping='{"id":"m_2","latlng":{"lat":1.352083,"lng":103.81983600000001},"tags":"drupal"}'>
+							<p class="info-box">DrupalCamp Singapore - Mar 03 2012</p>					
+						</li>
+						<li data-gmapping='{"id":"m_3","latlng":{"lat":39.7391536,"lng":-104.9847034},"tags":"drupal"}'>
+							<p class="info-box">DrupalCon 2012 Denver - Mar 20 2012</p>				
+						</li>
+						<li data-gmapping='{"id":"m_4","latlng":{"lat":36.1658899,"lng":-86.7844432},"tags":"drupal"}'>
+							<p class="info-box">DrupalCamp Nashville - Apr 28 2012</p>				
+						</li>
+						<li data-gmapping='{"id":"m_5","latlng":{"lat":55.6760968,"lng":12.568337100000008},"tags":"drupal"}'>
+							<p class="info-box">DrupalCamp Copenhagen 5.0 - May 11 2012</p>				
+						</li>
+					</ul>
+
+		<input id="btnTest" type="button" value="test">
+	</div><!-- /content -->
+
+</div><!-- /page -->
+
+</body>
+</html>

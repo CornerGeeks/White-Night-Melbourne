@@ -1,0 +1,3 @@
+# view AndroidManifest.xml #generated:54
+-keep class org.thewheatfield.white_night_melbourne.cordovaExample { <init>(...); }
+
